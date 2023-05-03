@@ -1,0 +1,69 @@
+This would explain how to use ef core power tools to create web api, also includes using autoMapper to work with procedure
+
+Database First Approact (using ef core power tools: https://www.c-sharpcorner.com/article/ef-core-power-tools-in-asp-net-core-api/) |
+-------------------------------------------------------------------------------------------------------------------------------------
+1. Create WebApi Project (StudentApi)
+2. Create Database According to need (Student) / StudentDetail Table
+3. Install following nuget packages: Microsoft.EntityFrameworkCore.SqlServer, Microsoft.Extensions.Configuration, Microsoft.EntityFrameworkCore.Tools,
+4. Create a folder Models and then run following command in the Package Manager Console (tools -> nuget -> package manager): 
+	Scaffold-DbContext "Server=PC0411\MSSQL2019;Database=Student;Trusted_Connection=True;" Microsoft.EntityFrameworkCore.SqlServer -OutputDir Models
+	We would find the models folder would include all the table models from the database
+	
+5. Remove everything inside OnConfiguring method in (StudentContext) class and put the configuration in program.cs file bellow addControllers as 
+	
+	// Add DbContext
+	builder.Services.AddDbContext<StudentContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+	
+	
+	In appsettings.Development.json file add connection string as 
+	"ConnectionStrings": {
+		"DefaultConnection": "Server=PC0411\\MSSQL2019;Database=Student;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+	}
+
+6. Try to build the solution if no errors everything is fine
+7. Adding StudentDetail Controller by scaffolding -> 
+	Right-click on the controller folder -> add -> new scaffolded item -> select api controller with actions, using entity framework
+	select model class, datacontext class and controller name and add
+
+8. Run the project
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Using Stored Procedure (https://www.c-sharpcorner.com/article/crud-operation-using-entity-framework-core-and-stored-procedure-in-net-core-6-w/)
+
+1. Need to install AutoMapper (https://www.c-sharpcorner.com/article/automapper-in-net-6-web-api/)
+2. Create a folder Helpers and create a class AutoMapperProfiles.cs
+	using AutoMapper;
+	using studentApi.Models;
+
+	namespace studentApi.Helpers
+	{
+		public class AutoMapperProfiles : Profile
+		{
+			public AutoMapperProfiles()
+			{
+				CreateMap<GetStudentDetailResult, StudentDetail>();
+			}
+		}
+	}
+	
+3. Put it inside the program.cs file bellow AddSwaggerGen()
+builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
+4. Inside controller constructor add IMapper and use it 
+	private readonly IMapper _autoMapper;
+	public StudentDetailsController(StudentContext context, IMapper autoMapper)
+	{
+		_context = context;
+		_autoMapper = autoMapper;
+	}
+	
+5. Now can call procedure as 
+
+	[HttpGet]
+	public async Task<ActionResult<IEnumerable<StudentDetail>>> GetStudentDetails()
+	{
+		if (_context.StudentDetail == null)
+		{
+			return NotFound();
+		}
+		return _autoMapper.Map<List<StudentDetail>>(await new StudentContextProcedures(_context).GetStudentDetailAsync());
+	}
